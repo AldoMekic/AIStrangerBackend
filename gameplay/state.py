@@ -39,6 +39,14 @@ class GameState:
         "PLAYER1": "ELEVEN",
         "Player1": "ELEVEN",
         "player1": "ELEVEN",
+
+        "MAX": "MAX",
+        "Max": "MAX",
+        "max": "MAX",
+        "PLAYER2": "MAX",
+        "Player2": "MAX",
+        "player2": "MAX",
+
         "DEMOGORGON": "DEMOGORGON",
         "Demogorgon": "DEMOGORGON",
         "demogorgon": "DEMOGORGON",
@@ -173,8 +181,9 @@ class GameState:
 
     def advance_turn(self) -> None:
         """
-        Required by GameRules.result().
-        Uses canonical character identity values only.
+        Turn handling:
+        - PVA: ELEVEN alternates with the AI enemy
+        - PVP: ELEVEN alternates with MAX
         """
         if self.game_mode == "PVA":
             ai_name = self.AI_BY_LEVEL.get(self.difficulty_level, "DEMOGORGON")
@@ -187,6 +196,19 @@ class GameState:
             if next_turn in self.characters and self.characters[next_turn].stuck:
                 self.characters[next_turn].stuck = False
                 next_turn = "ELEVEN" if next_turn != "ELEVEN" else ai_name
+
+            self.current_turn = next_turn
+            return
+
+        if self.game_mode == "PVP":
+            if self.current_turn == "ELEVEN":
+                next_turn = "MAX"
+            else:
+                next_turn = "ELEVEN"
+
+            if next_turn in self.characters and self.characters[next_turn].stuck:
+                self.characters[next_turn].stuck = False
+                next_turn = "ELEVEN" if next_turn == "MAX" else "MAX"
 
             self.current_turn = next_turn
             return
@@ -264,12 +286,26 @@ class GameState:
         return MoveValidator.is_terminal(self) or self.is_over
 
     def player_at_goal(self) -> bool:
-        if "ELEVEN" not in self.characters or self.goal_position is None:
+        if self.goal_position is None:
             return False
-        return self.characters["ELEVEN"].pos == self.goal_position
+
+        for player_name in ("ELEVEN", "MAX"):
+            if player_name in self.characters and self.characters[player_name].pos == self.goal_position:
+                return True
+
+        return False
 
     def get_closest_player_position(self, reference_pos: Position) -> Position:
-        return self.get_position("ELEVEN")
+        player_names = [name for name in ("ELEVEN", "MAX") if name in self.characters]
+
+        if not player_names:
+            return reference_pos
+
+        closest_name = min(
+            player_names,
+            key=lambda name: abs(self.get_position(name)[0] - reference_pos[0]) + abs(self.get_position(name)[1] - reference_pos[1]),
+        )
+        return self.get_position(closest_name)
 
     def get_current_state(self) -> Position:
         return self.get_position(self.current_turn)

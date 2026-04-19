@@ -16,6 +16,7 @@ class Game(models.Model):
 
     WINNER_CHOICES = [
         ('ELEVEN', 'Eleven'),
+        ('MAX', 'Max'),
         ('DEMOGORGON', 'Demogorgon'),
         ('SHADOWMONSTER', 'Shadowmonster'),
         ('MINDFLAYER', 'Mindflayer'),
@@ -49,6 +50,7 @@ class Character(models.Model):
     """
     CHARACTER_TYPES = [
         ('ELEVEN', 'Eleven'),
+        ('MAX', 'Max'),
         ('DEMOGORGON', 'Demogorgon'),
         ('SHADOWMONSTER', 'Shadowmonster'),
         ('MINDFLAYER', 'Mindflayer'),

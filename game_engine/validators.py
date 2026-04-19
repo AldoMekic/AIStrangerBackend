@@ -34,7 +34,7 @@ class MoveValidator:
 
     @staticmethod
     def is_terminal(state):
-        if MoveValidator._agent_caught_player(state):
+        if state.game_mode == "PVA" and MoveValidator._agent_caught_player(state):
             return True
 
         if state.player_at_goal():

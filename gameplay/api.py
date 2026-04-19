@@ -61,6 +61,10 @@ class GameViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+
+        goal_position = (grid_size - 1, grid_size - 1)
+        reserved_positions = {goal_position}
+
         # Create game root
         game = Game.objects.create(
             grid_size=grid_size,
@@ -72,9 +76,6 @@ class GameViewSet(viewsets.ModelViewSet):
             goal_x=goal_position[0],
             goal_y=goal_position[1],
         )
-
-        goal_position = (grid_size - 1, grid_size - 1)
-        reserved_positions = {goal_position}
 
         # Place Eleven
         eleven_pos = self._choose_player_start(grid_size, reserved_positions)
@@ -89,6 +90,20 @@ class GameViewSet(viewsets.ModelViewSet):
             is_ai=False,
             stuck=False,
         )
+
+        if game_mode == "PVP":
+            max_pos = self._choose_second_player_start(grid_size, reserved_positions, eleven_pos)
+            reserved_positions.add(max_pos)
+
+            Character.objects.create(
+                game=game,
+                name="MAX",
+                x_pos=max_pos[0],
+                y_pos=max_pos[1],
+                has_powers=True,
+                is_ai=False,
+                stuck=False,
+            )
 
         # PVA: create exactly one AI enemy based on selected level
         if game_mode == "PVA":
@@ -124,7 +139,9 @@ class GameViewSet(viewsets.ModelViewSet):
 
         state = GameState.from_game(game)
 
-        if state.current_turn != "ELEVEN":
+        allowed_human_turns = {"ELEVEN"} if state.game_mode == "PVA" else {"ELEVEN", "MAX"}
+
+        if state.current_turn not in allowed_human_turns:
             return Response(
                 {"error": f"It is currently {state.current_turn}'s turn."},
                 status=status.HTTP_400_BAD_REQUEST,
@@ -248,16 +265,19 @@ class GameViewSet(viewsets.ModelViewSet):
         return action
 
     def _finalize_terminal_state(self, state):
-        if state.player_at_goal():
-            state.is_over = True
-            state.winner = "ELEVEN"
-            return
+        if state.goal_position is not None:
+            for player_name in ("ELEVEN", "MAX"):
+                if player_name in state.characters and state.get_position(player_name) == state.goal_position:
+                    state.is_over = True
+                    state.winner = player_name
+                    return
 
-        for enemy in ("DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"):
-            if enemy in state.characters and state.get_position(enemy) == state.get_position("ELEVEN"):
-                state.is_over = True
-                state.winner = enemy
-                return
+        if state.game_mode == "PVA":
+            for enemy in ("DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"):
+                if enemy in state.characters and state.get_position(enemy) == state.get_position("ELEVEN"):
+                    state.is_over = True
+                    state.winner = enemy
+                    return
 
         state.is_over = False
         state.winner = None
@@ -356,3 +376,25 @@ class GameViewSet(viewsets.ModelViewSet):
     def _is_within_bounds(self, pos, grid_size):
         x, y = pos
         return 0 <= x < grid_size and 0 <= y < grid_size
+    
+    def _choose_second_player_start(self, grid_size, reserved_positions, first_player_pos):
+        """
+        Start the second player away from Eleven, but not on reserved cells.
+        """
+        candidates = []
+        for x in range(grid_size):
+            for y in range(grid_size):
+                pos = (x, y)
+                if pos in reserved_positions:
+                    continue
+
+                dist = self._manhattan_distance(pos, first_player_pos)
+                candidates.append((dist, pos))
+
+        candidates.sort(reverse=True, key=lambda item: item[0])
+
+        top = [pos for _, pos in candidates[:5]] if candidates else []
+        if top:
+            return random.choice(top)
+
+        return self._random_free_cell(grid_size, reserved_positions)
