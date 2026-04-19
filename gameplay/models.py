@@ -42,6 +42,7 @@ class Character(models.Model):
     y_pos = models.IntegerField() # Vertical coordinate on the grid
     has_powers = models.BooleanField(default=False) # Enables teleportation [Requirement]
     is_ai = models.BooleanField(default=False)
+    stuck = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.name} at ({self.x_pos}, {self.y_pos})"

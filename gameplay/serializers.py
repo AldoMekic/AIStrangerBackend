@@ -7,7 +7,7 @@ class CharacterSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = Character
-        fields = ['id', 'name', 'x_pos', 'y_pos', 'has_powers', 'is_ai']
+        fields = ['id', 'name', 'x_pos', 'y_pos', 'has_powers', 'is_ai', 'stuck']
 
 class ObstacleSerializer(serializers.ModelSerializer):
     """

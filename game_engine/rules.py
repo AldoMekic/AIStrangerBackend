@@ -48,6 +48,47 @@ class GameRules:
         if direction == 'LEFT':  return (x - 1, y)
         if direction == 'RIGHT': return (x + 1, y)
         return (x, y)
+    
+
+    @staticmethod
+    def _get_safe_random_position(state, agent_name):
+        """
+        Returns a random valid relocation cell for trap effects.
+
+        Excludes:
+        - impassable cells
+        - occupied cells (except the moving character's current cell)
+        - the goal tile
+        """
+        valid_positions = []
+        current_pos = state.get_position(agent_name)
+
+        for x in range(state.grid_size):
+            for y in range(state.grid_size):
+                candidate = (x, y)
+
+                if not state.is_within_bounds(candidate):
+                    continue
+
+                if state.is_impassable(candidate):
+                    continue
+
+                if state.is_forbidden_relocation_cell(candidate):
+                    continue
+
+                if state.is_occupied(candidate, exclude_agent=agent_name):
+                    continue
+
+                # avoid pointless relocation to same spot
+                if candidate == current_pos:
+                    continue
+
+                valid_positions.append(candidate)
+
+        if not valid_positions:
+            return None
+
+        return random.choice(valid_positions)
 
     @staticmethod
     def _process_hazards(state, agent_name, pos):
@@ -64,6 +105,6 @@ class GameRules:
         elif hazard == 'TRAP':
             # Nondeterministic outcome: 50% chance of random relocation [2, 11]
             if random.random() < 0.5:
-                random_pos = (random.randint(0, state.grid_size-1), 
-                              random.randint(0, state.grid_size-1))
-                state.update_character(agent_name, pos=random_pos)
+                safe_pos = GameRules._get_safe_random_position(state, agent_name)
+                if safe_pos is not None:
+                    state.update_character(agent_name, pos=safe_pos)
