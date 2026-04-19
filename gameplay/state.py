@@ -338,3 +338,30 @@ class GameState:
         if self.goal_position is not None and pos == self.goal_position:
             return True
         return False
+    
+    def is_valid_teleport_destination(self, pos, agent_name: str) -> bool:
+        normalized = self.normalize_name(agent_name)
+
+        if not isinstance(pos, tuple) or len(pos) != 2:
+            return False
+
+        x, y = pos
+        if not isinstance(x, int) or not isinstance(y, int):
+            return False
+
+        if not self.is_within_bounds(pos):
+            return False
+
+        if self.is_impassable(pos):
+            return False
+
+        if self.is_forbidden_relocation_cell(pos):
+            return False
+
+        if self.is_occupied(pos, exclude_agent=normalized):
+            return False
+
+        if pos == self.get_position(normalized):
+            return False
+
+        return True

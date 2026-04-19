@@ -22,20 +22,20 @@ class GameSerializer(serializers.ModelSerializer):
     The primary serializer representing the complete State Space of the game.
     Nests characters and obstacles to provide a full snapshot of the current environment.
     """
-    # Use related_names from models.py to nest child objects
     characters = CharacterSerializer(many=True, read_only=True)
     obstacles = ObstacleSerializer(many=True, read_only=True)
 
     class Meta:
         model = Game
         fields = [
-            'id', 
-            'grid_size', 
-            'game_mode', 
-            'difficulty_level', 
-            'current_turn', 
-            'is_over', 
+            'id',
+            'grid_size',
+            'game_mode',
+            'difficulty_level',
+            'current_turn',
+            'is_over',
+            'winner',
             'created_at',
-            'characters', 
+            'characters',
             'obstacles'
         ]

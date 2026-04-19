@@ -29,10 +29,16 @@ class GameRules:
                 GameRules._process_hazards(new_state, agent['name'], new_pos)
 
         elif action['type'] == 'TELEPORT':
-            # Requirement: Teleportation enabled by 'hidden powers'
-            if agent.get('has_powers', False):
-                new_state.update_character(agent['name'], pos=action['destination'])
-                # Teleportation consumes 'hidden powers' as an effect [7]
+            destination = action.get('destination')
+
+            # Requirement: Teleportation enabled by hidden powers
+            if agent.get('has_powers', False) and GameRules._is_valid_teleport_destination(
+                new_state,
+                agent['name'],
+                destination,
+            ):
+                new_state.update_character(agent['name'], pos=destination)
+                # Teleportation consumes hidden powers
                 new_state.update_character(agent['name'], has_powers=False)
 
         # Update the turn fluent to the next player [8, 9]
@@ -108,3 +114,40 @@ class GameRules:
                 safe_pos = GameRules._get_safe_random_position(state, agent_name)
                 if safe_pos is not None:
                     state.update_character(agent_name, pos=safe_pos)
+    
+    @staticmethod
+    def _is_valid_teleport_destination(state, agent_name, destination):
+        """
+        Defensive validation for teleport destinations.
+
+        Rejects:
+        - missing or malformed coordinates
+        - out-of-bounds cells
+        - impassable cells
+        - occupied cells
+        - forbidden cells such as the goal tile
+        - teleporting to the same current position
+        """
+        if not isinstance(destination, tuple) or len(destination) != 2:
+            return False
+
+        x, y = destination
+        if not isinstance(x, int) or not isinstance(y, int):
+            return False
+
+        if not state.is_within_bounds(destination):
+            return False
+
+        if state.is_impassable(destination):
+            return False
+
+        if state.is_forbidden_relocation_cell(destination):
+            return False
+
+        if state.is_occupied(destination, exclude_agent=agent_name):
+            return False
+
+        if destination == state.get_position(agent_name):
+            return False
+
+        return True

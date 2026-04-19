@@ -2,11 +2,11 @@ import math
 
 def manhattan_distance(pos1, pos2):
     """
-    Standard Manhattan (City Block) distance heuristic [8, 9].
-    Admissible for grid-based movement because it never overestimates 
-    the steps to the goal.
+    Standard Manhattan (City Block) distance heuristic.
+    Admissible for grid-based movement because it never overestimates
+    the steps to the goal on a 4-direction grid.
     """
-    return abs(pos1 - pos2) + abs(pos1[10] - pos2[10])
+    return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
 class StrangerThingsEvaluator:
     """

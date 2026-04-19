@@ -21,20 +21,16 @@ class MoveValidator:
 
         # 2. Teleportation
         if state.has_hidden_powers(agent_name):
-            for x in range(state.grid_size):
-                for y in range(state.grid_size):
-                    destination = (x, y)
+            teleport_radius = 2
+            teleport_destinations = MoveValidator._get_teleport_candidates(
+                state,
+                agent_name,
+                current_pos,
+                teleport_radius,
+            )
 
-                    if destination == current_pos:
-                        continue
-
-                    if not state.is_within_bounds(destination):
-                        continue
-
-                    if state.is_impassable(destination):
-                        continue
-
-                    legal_actions.append({'type': 'TELEPORT', 'destination': destination})
+            for destination in teleport_destinations:
+                legal_actions.append({'type': 'TELEPORT', 'destination': destination})
 
         return legal_actions
 
@@ -68,3 +64,40 @@ class MoveValidator:
         if direction == 'RIGHT':
             return (x + 1, y)
         return (x, y)
+    
+    @staticmethod
+    def _get_teleport_candidates(state, agent_name, current_pos, radius=2, max_candidates=8):
+        """
+        Generate a constrained set of teleport destinations.
+
+        Strategy:
+        - only cells within a Manhattan radius
+        - only safe/legal teleport targets
+        - optionally cap the total number of candidates
+        """
+        candidates = []
+
+        for x in range(state.grid_size):
+            for y in range(state.grid_size):
+                destination = (x, y)
+
+                if MoveValidator._manhattan_distance(current_pos, destination) > radius:
+                    continue
+
+                if not state.is_valid_teleport_destination(destination, agent_name):
+                    continue
+
+                candidates.append(destination)
+
+        # Keep branching predictable
+        candidates.sort(key=lambda pos: (
+            MoveValidator._manhattan_distance(current_pos, pos),
+            pos[1],
+            pos[0],
+        ))
+
+        return candidates[:max_candidates]
+
+    @staticmethod
+    def _manhattan_distance(pos1, pos2):
+        return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])

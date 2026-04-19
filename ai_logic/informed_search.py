@@ -77,11 +77,11 @@ class ShadowmonsterAgent:
 
     def manhattan_heuristic(self, state, goal):
         """
-        Manhattan distance (City Block distance) heuristic [20].
-        Admissible because it never overestimates the steps to the goal on a grid [20, 21].
+        Manhattan distance (City Block distance) heuristic.
+        Admissible because it never overestimates the steps to the goal
+        on a 4-direction grid.
         """
-        # d = |x1 - x2| + |y1 - y2|
-        return abs(state - goal) + abs(state[22] - goal[22])
+        return abs(state[0] - goal[0]) + abs(state[1] - goal[1])
 
     def solution_path(self, node):
         """
