@@ -19,13 +19,9 @@ class GameRules:
 
         if action['type'] == 'MOVE':
             new_pos = GameRules._calculate_new_position(agent['pos'], action['direction'])
-            
-            # Boundary validation for 5x5 to 8x8 grids [Requirement]
-            if state.is_within_bounds(new_pos):
-                # Update the character's position fluent [4, 5]
+
+            if new_state.can_move_to(new_pos, agent['name']):
                 new_state.update_character(agent['name'], pos=new_pos)
-                
-                # Check for hazards (Veins/Traps) which introduce nondeterminism [2, 6]
                 GameRules._process_hazards(new_state, agent['name'], new_pos)
 
         elif action['type'] == 'TELEPORT':
@@ -151,3 +147,10 @@ class GameRules:
             return False
 
         return True
+    
+    @staticmethod
+    def _is_capture_move(state, agent_name, destination):
+        """
+        A move is a capture if the destination is occupied by an enemy.
+        """
+        return state.is_enemy_occupied(destination, agent_name)

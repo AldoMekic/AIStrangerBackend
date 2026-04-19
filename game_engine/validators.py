@@ -14,10 +14,8 @@ class MoveValidator:
         for direction in directions:
             new_pos = MoveValidator._calculate_new_position(current_pos, direction)
 
-            # Canonical boundary check lives on the state object
-            if state.is_within_bounds(new_pos):
-                if not state.is_impassable(new_pos):
-                    legal_actions.append({'type': 'MOVE', 'direction': direction})
+            if state.can_move_to(new_pos, agent_name):
+                legal_actions.append({'type': 'MOVE', 'direction': direction})
 
         # 2. Teleportation
         if state.has_hidden_powers(agent_name):
@@ -70,10 +68,13 @@ class MoveValidator:
         """
         Generate a constrained set of teleport destinations.
 
-        Strategy:
-        - only cells within a Manhattan radius
-        - only safe/legal teleport targets
-        - optionally cap the total number of candidates
+        Uses the same safety rules as runtime teleport validation and
+        trap relocation safety:
+        - within Manhattan radius
+        - not impassable
+        - not occupied
+        - not forbidden (for example, the goal tile)
+        - not the current position
         """
         candidates = []
 
@@ -89,7 +90,6 @@ class MoveValidator:
 
                 candidates.append(destination)
 
-        # Keep branching predictable
         candidates.sort(key=lambda pos: (
             MoveValidator._manhattan_distance(current_pos, pos),
             pos[1],

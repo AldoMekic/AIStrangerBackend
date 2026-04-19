@@ -88,7 +88,7 @@ class GameState:
             current_turn=cls.normalize_name(game.current_turn),
             is_over=game.is_over,
             winner=getattr(game, "winner", None),
-            goal_position=(game.grid_size - 1, game.grid_size - 1),
+            goal_position=(game.goal_x, game.goal_y),
             characters=characters,
             obstacles=obstacles,
         )
@@ -100,7 +100,11 @@ class GameState:
         if hasattr(game, "winner"):
             game.winner = self.winner
 
-        update_fields = ["current_turn", "is_over"]
+        if self.goal_position is not None:
+            game.goal_x = self.goal_position[0]
+            game.goal_y = self.goal_position[1]
+
+        update_fields = ["current_turn", "is_over", "goal_x", "goal_y"]
         if hasattr(game, "winner"):
             update_fields.append("winner")
 
@@ -339,7 +343,54 @@ class GameState:
             return True
         return False
     
+    def get_character_at(self, pos):
+        """
+        Returns the canonical character name occupying the cell, or None.
+        """
+        for name, ch in self.characters.items():
+            if ch.pos == pos:
+                return name
+        return None
+
+    def is_enemy_occupied(self, pos, agent_name: str) -> bool:
+        """
+        True if the destination is occupied by a different character.
+        """
+        normalized = self.normalize_name(agent_name)
+        occupant = self.get_character_at(pos)
+        return occupant is not None and occupant != normalized
+
+    def can_move_to(self, pos, agent_name: str) -> bool:
+        """
+        Formalized movement rule:
+        - must be within bounds
+        - must not be impassable
+        - may move into an enemy-occupied tile (capture)
+        - may not move into a friendly-occupied tile
+        """
+        normalized = self.normalize_name(agent_name)
+
+        if not self.is_within_bounds(pos):
+            return False
+
+        if self.is_impassable(pos):
+            return False
+
+        occupant = self.get_character_at(pos)
+        if occupant is None:
+            return True
+
+        return occupant != normalized
+
     def is_valid_teleport_destination(self, pos, agent_name: str) -> bool:
+        """
+        Teleport rule:
+        - must be within bounds
+        - must not be impassable
+        - must not be occupied
+        - must not be a forbidden cell such as the goal tile
+        - must not be the current position
+        """
         normalized = self.normalize_name(agent_name)
 
         if not isinstance(pos, tuple) or len(pos) != 2:
@@ -365,3 +416,4 @@ class GameState:
             return False
 
         return True
+    

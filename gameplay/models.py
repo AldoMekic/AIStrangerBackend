@@ -33,6 +33,10 @@ class Game(models.Model):
         blank=True,
         default=None,
     )
+
+    goal_x = models.IntegerField(default=4)
+    goal_y = models.IntegerField(default=4)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
