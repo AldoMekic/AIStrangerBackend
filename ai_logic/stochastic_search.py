@@ -86,7 +86,7 @@ class MindflayerAgent:
             current_rollout_state = current_rollout_state.result(action)
         
         # Return the final utility from the Mindflayer's perspective [9, 10]
-        return current_rollout_state.utility("Mindflayer")
+        return current_rollout_state.utility("MINDFLAYER")
 
     def backpropagate(self, node, reward):
         """

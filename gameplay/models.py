@@ -17,7 +17,7 @@ class Game(models.Model):
     grid_size = models.IntegerField(choices=GRID_SIZE_CHOICES, default=5)
     game_mode = models.CharField(max_length=3, choices=MODE_CHOICES, default='PVA')
     difficulty_level = models.IntegerField(choices=LEVEL_CHOICES, default=1)
-    current_turn = models.CharField(max_length=50, default='Player1')
+    current_turn = models.CharField(max_length=50, default='ELEVEN')
     is_over = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

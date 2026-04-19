@@ -47,7 +47,7 @@ class DemogorgonAgent:
 
     def max_value(self, state, depth):
         if state.is_terminal() or depth >= self.depth_limit:
-            return state.utility("Demogorgon") # [5, 11]
+            return state.utility("DEMOGORGON") # [5, 11]
         
         v = -INFINITY
         for action in state.get_legal_moves():
@@ -56,7 +56,7 @@ class DemogorgonAgent:
 
     def min_value(self, state, depth):
         if state.is_terminal() or depth >= self.depth_limit:
-            return state.utility("Demogorgon")
+            return state.utility("DEMOGORGON")
         
         v = INFINITY
         for action in state.get_legal_moves():
@@ -78,7 +78,7 @@ class DemogorgonAgent:
 
     def ab_max_value(self, state, depth, alpha, beta):
         if state.is_terminal() or depth >= self.depth_limit:
-            return state.utility("Demogorgon"), None
+            return state.utility("DEMOGORGON"), None
         
         v = -INFINITY
         best_move = None
@@ -100,7 +100,7 @@ class DemogorgonAgent:
 
     def ab_min_value(self, state, depth, alpha, beta):
         if state.is_terminal() or depth >= self.depth_limit:
-            return state.utility("Demogorgon"), None
+            return state.utility("DEMOGORGON"), None
         
         v = INFINITY
         best_move = None

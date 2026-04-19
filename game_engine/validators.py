@@ -61,9 +61,9 @@ class MoveValidator:
     @staticmethod
     def _agent_caught_player(state):
         """Logic to determine if any monster occupies the same square as the player."""
-        player_pos = state.get_position('Eleven')
-        for monster in ['Demogorgon', 'Shadowmonster', 'Mindflayer']:
-            if state.get_position(monster) == player_pos:
+        player_pos = state.get_position('ELEVEN')
+        for monster in ['DEMOGORGON', 'SHADOWMONSTER', 'MINDFLAYER']:
+            if monster in state.characters and state.get_position(monster) == player_pos:
                 return True
         return False
 
