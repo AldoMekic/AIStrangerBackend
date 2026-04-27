@@ -1,4 +1,5 @@
 import math
+from ai_logic.evaluators import StrangerThingsEvaluator
 
 # Define infinity for minimax initialization [7, 8]
 INFINITY = math.inf
@@ -46,8 +47,11 @@ class DemogorgonAgent:
         return best_move
 
     def max_value(self, state, depth):
-        if state.is_terminal() or depth >= self.depth_limit:
-            return state.utility("DEMOGORGON") # [5, 11]
+        if state.is_terminal():
+            return state.utility("DEMOGORGON")
+
+        if depth >= self.depth_limit:
+            return self.evaluate_state(state)
         
         v = -INFINITY
         for action in state.get_legal_moves():
@@ -55,8 +59,11 @@ class DemogorgonAgent:
         return v
 
     def min_value(self, state, depth):
-        if state.is_terminal() or depth >= self.depth_limit:
+        if state.is_terminal():
             return state.utility("DEMOGORGON")
+
+        if depth >= self.depth_limit:
+            return self.evaluate_state(state)
         
         v = INFINITY
         for action in state.get_legal_moves():
@@ -77,8 +84,11 @@ class DemogorgonAgent:
         return best_move
 
     def ab_max_value(self, state, depth, alpha, beta):
-        if state.is_terminal() or depth >= self.depth_limit:
+        if state.is_terminal():
             return state.utility("DEMOGORGON"), None
+
+        if depth >= self.depth_limit:
+            return self.evaluate_state(state), None
         
         v = -INFINITY
         best_move = None
@@ -99,8 +109,11 @@ class DemogorgonAgent:
         return v, best_move
 
     def ab_min_value(self, state, depth, alpha, beta):
-        if state.is_terminal() or depth >= self.depth_limit:
+        if state.is_terminal():
             return state.utility("DEMOGORGON"), None
+
+        if depth >= self.depth_limit:
+            return self.evaluate_state(state), None
         
         v = INFINITY
         best_move = None
@@ -119,3 +132,12 @@ class DemogorgonAgent:
             beta = min(beta, v)
             
         return v, best_move
+    
+    def evaluate_state(self, state):
+        """
+        Explicitly separates terminal utility from depth-cutoff heuristic evaluation.
+        """
+        if state.is_terminal():
+            return state.utility("DEMOGORGON")
+
+        return StrangerThingsEvaluator.static_evaluation(state, "DEMOGORGON")

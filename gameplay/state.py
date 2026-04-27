@@ -342,6 +342,14 @@ class GameState:
 
     def is_goal(self, pos: Position) -> bool:
         return pos == self.get_player_location()
+    
+    def is_exit_goal(self, pos: Position) -> bool:
+        """
+        World goal check.
+
+        Returns True if the position is the escape/exit tile.
+        """
+        return self.goal_position is not None and pos == self.goal_position
 
     def step_cost(self, _state: Position, _action: Dict[str, Any]) -> int:
         return 1

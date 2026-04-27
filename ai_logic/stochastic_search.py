@@ -1,5 +1,6 @@
 import math
 import random
+from ai_logic.evaluators import StrangerThingsEvaluator
 
 class MCTSNode:
     """
@@ -22,9 +23,10 @@ class MindflayerAgent:
     AI Agent representing the Mindflayer.
     Implements Level 4: Monte Carlo Tree Search (MCTS) with UCT [Requirement, 530].
     """
-    def __init__(self, iterations=1000, exploration_constant=math.sqrt(2)):
+    def __init__(self, iterations=1000, exploration_constant=math.sqrt(2), rollout_depth_limit=20):
         self.iterations = iterations
         self.exploration_constant = exploration_constant
+        self.rollout_depth_limit = rollout_depth_limit
 
     def get_action(self, game_state):
         """
@@ -72,21 +74,32 @@ class MindflayerAgent:
 
     def simulate(self, state):
         """
-        Rollout: From the new state, play a random game until a terminal 
-        state is reached [1, 3]. This handles stochastic elements 
-        like 'traps' by averaging their impact over many runs [4, 7].
+        Rollout phase for MCTS.
+
+        Performs random simulation up to a fixed depth limit.
+        If the rollout does not reach a terminal state, it returns a
+        heuristic evaluation instead of stopping with weak information.
         """
         current_rollout_state = state
-        while not current_rollout_state.is_terminal():
+        depth = 0
+
+        while not current_rollout_state.is_terminal() and depth < self.rollout_depth_limit:
             possible_moves = current_rollout_state.get_legal_moves()
+
             if not possible_moves:
                 break
-            # Random selection of moves (random walk) [3, 8]
+
             action = random.choice(possible_moves)
             current_rollout_state = current_rollout_state.result(action)
-        
-        # Return the final utility from the Mindflayer's perspective [9, 10]
-        return current_rollout_state.utility("MINDFLAYER")
+            depth += 1
+
+        if current_rollout_state.is_terminal():
+            return current_rollout_state.utility("MINDFLAYER")
+
+        return StrangerThingsEvaluator.static_evaluation(
+            current_rollout_state,
+            "MINDFLAYER",
+        )
 
     def backpropagate(self, node, reward):
         """

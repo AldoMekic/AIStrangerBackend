@@ -21,8 +21,18 @@ class GameRules:
             new_pos = GameRules._calculate_new_position(agent['pos'], action['direction'])
 
             if new_state.can_move_to(new_pos, agent['name']):
+                is_capture = GameRules._is_capture_move(
+                    new_state,
+                    agent['name'],
+                    new_pos,
+                )
+
                 new_state.update_character(agent['name'], pos=new_pos)
-                GameRules._process_hazards(new_state, agent['name'], new_pos)
+
+                # Hazards are processed only for non-capture movement.
+                # If capture happens, terminal logic will end the game.
+                if not is_capture:
+                    GameRules._process_hazards(new_state, agent['name'], new_pos)
 
         elif action['type'] == 'TELEPORT':
             destination = action.get('destination')

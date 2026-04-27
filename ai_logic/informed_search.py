@@ -31,49 +31,58 @@ class ShadowmonsterAgent:
 
     def a_star_search(self, problem):
         """
-        A* algorithm: Minimizes the total estimated solution cost [2].
-        Uses a priority queue for the frontier and an explored set for efficiency [8, 10].
+        A* algorithm with best-cost tracking.
+
+        Prevents repeated states from being expanded through more expensive paths.
         """
-        # 1. Initialize start node and goal information
         start_state = problem.get_current_state()
         goal_state = problem.get_player_location()
         h_start = self.manhattan_heuristic(start_state, goal_state)
-        
+
         start_node = Node(state=start_state, path_cost=0, heuristic=h_start)
-        
-        # 2. Frontier as a Priority Queue (Min-Heap) [8, 9]
+
         frontier = []
         heapq.heappush(frontier, start_node)
-        
-        # 3. Explored set to handle repeated states in the grid [3]
+
+        best_cost = {
+            start_state: 0
+        }
+
         explored = set()
 
         while frontier:
-            # 4. Pop the node with the lowest f(n) from the frontier [9, 10]
             node = heapq.heappop(frontier)
-            
-            # 5. Goal Test: Check if we have reached the player's position [11, 12]
+
+            if node.state in explored:
+                continue
+
             if problem.is_goal(node.state):
                 return self.solution_path(node)
-            
-            # 6. Add node to explored set [3, 13]
+
             explored.add(node.state)
-            
-            # 7. Expand the node by generating child nodes [14, 15]
+
             for action in problem.get_legal_moves(node.state):
-                # Transition model: RESULT(s, a) [16, 17]
                 child_state = problem.result(node.state, action)
-                
-                if child_state not in explored:
-                    # Path cost: g(child) = g(parent) + step_cost [6]
-                    g_cost = node.g + problem.step_cost(node.state, action)
+                new_cost = node.g + problem.step_cost(node.state, action)
+
+                if child_state in explored:
+                    continue
+
+                if child_state not in best_cost or new_cost < best_cost[child_state]:
+                    best_cost[child_state] = new_cost
+
                     h_cost = self.manhattan_heuristic(child_state, goal_state)
-                    child_node = Node(child_state, node, action, g_cost, h_cost)
-                    
-                    # Add to frontier if not already present with a better cost [18]
+                    child_node = Node(
+                        state=child_state,
+                        parent=node,
+                        action=action,
+                        path_cost=new_cost,
+                        heuristic=h_cost,
+                    )
+
                     heapq.heappush(frontier, child_node)
-                    
-        return None # No path found [19]
+
+        return None
 
     def manhattan_heuristic(self, state, goal):
         """
