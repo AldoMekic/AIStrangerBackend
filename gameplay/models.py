@@ -6,7 +6,7 @@ class Game(models.Model):
     Stores the configuration and high-level environment parameters.
     """
     GRID_SIZE_CHOICES = [(i, f"{i}x{i}") for i in range(5, 9)]
-    MODE_CHOICES = [('PVP', 'Player vs Player'), ('PVA', 'Player vs AI')]
+    MODE_CHOICES = [('PVP', 'Player vs Player'), ('PVA', 'Player vs AI'), ('P2VA', '2 Players vs AI')]
     LEVEL_CHOICES = [
         (1, 'Level 1: Minimax (Demogorgon)'),
         (2, 'Level 2: Alpha-Beta (Demogorgon)'),

@@ -49,9 +49,9 @@ class GameViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        if game_mode not in ["PVP", "PVA"]:
+        if game_mode not in ["PVP", "PVA", "P2VA"]:
             return Response(
-                {"error": "game_mode must be either 'PVP' or 'PVA'."},
+                {"error": "game_mode must be either 'PVP', 'PVA' or 'P2VA'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -91,7 +91,7 @@ class GameViewSet(viewsets.ModelViewSet):
             stuck=False,
         )
 
-        if game_mode == "PVP":
+        if game_mode in ["PVP", "P2VA"]:
             max_pos = self._choose_second_player_start(grid_size, reserved_positions, eleven_pos)
             reserved_positions.add(max_pos)
 
@@ -106,9 +106,17 @@ class GameViewSet(viewsets.ModelViewSet):
             )
 
         # PVA: create exactly one AI enemy based on selected level
-        if game_mode == "PVA":
+        if game_mode in ["PVA", "P2VA"]:
             enemy_name = self._get_enemy_name_for_level(difficulty_level)
-            enemy_pos = self._choose_enemy_start(grid_size, reserved_positions, eleven_pos)
+
+            anchor_pos = eleven_pos
+            if game_mode == "P2VA":
+                anchor_pos = max(
+                    [eleven_pos, max_pos],
+                    key=lambda p: self._manhattan_distance(p, goal_position)
+                )
+
+            enemy_pos = self._choose_enemy_start(grid_size, reserved_positions, anchor_pos)
             reserved_positions.add(enemy_pos)
 
             Character.objects.create(
@@ -139,7 +147,12 @@ class GameViewSet(viewsets.ModelViewSet):
 
         state = GameState.from_game(game)
 
-        allowed_human_turns = {"ELEVEN"} if state.game_mode == "PVA" else {"ELEVEN", "MAX"}
+        if state.game_mode == "PVA":
+            allowed_human_turns = {"ELEVEN"}
+        elif state.game_mode in ["PVP", "P2VA"]:
+            allowed_human_turns = {"ELEVEN", "MAX"}
+        else:
+            allowed_human_turns = {"ELEVEN"}
 
         if state.current_turn not in allowed_human_turns:
             return Response(
@@ -172,34 +185,37 @@ class GameViewSet(viewsets.ModelViewSet):
             serializer = self.get_serializer(game)
             return Response(serializer.data)
 
-        if state.game_mode == "PVA":
-            agent = self._get_agent(state.difficulty_level)
+        if state.game_mode in ["PVA", "P2VA"]:
+            ai_name = self._get_enemy_name_for_level(state.difficulty_level)
 
-            if agent is None:
-                return Response(
-                    {"error": "No AI agent configured for this difficulty."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
+            if state.current_turn == ai_name:
+                agent = self._get_agent(state.difficulty_level)
 
-            ai_action = self._get_ai_action(agent, state)
-
-            if ai_action is None:
-                state.is_over = True
-                state.winner = "ELEVEN"
-            else:
-                ai_legal_actions = state.get_legal_moves()
-                if not self._action_in_list(ai_action, ai_legal_actions):
+                if agent is None:
                     return Response(
-                        {
-                            "error": "AI produced an illegal move.",
-                            "ai_action": ai_action,
-                            "legal_actions": ai_legal_actions,
-                        },
+                        {"error": "No AI agent configured for this difficulty."},
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
-                state = state.result(ai_action)
-                self._finalize_terminal_state(state)
+                ai_action = self._get_ai_action(agent, state)
+
+                if ai_action is None:
+                    state.advance_turn()
+                else:
+                    ai_legal_actions = state.get_legal_moves()
+
+                    if not self._action_in_list(ai_action, ai_legal_actions):
+                        return Response(
+                            {
+                                "error": "AI produced an illegal move.",
+                                "ai_action": ai_action,
+                                "legal_actions": ai_legal_actions,
+                            },
+                            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        )
+
+                    state = state.result(ai_action)
+                    self._finalize_terminal_state(state)
 
         state.apply_to_game(game)
         serializer = self.get_serializer(game)
@@ -272,12 +288,16 @@ class GameViewSet(viewsets.ModelViewSet):
                     state.winner = player_name
                     return
 
-        if state.game_mode == "PVA":
+        if state.game_mode in ["PVA", "P2VA"]:
             for enemy in ("DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"):
-                if enemy in state.characters and state.get_position(enemy) == state.get_position("ELEVEN"):
-                    state.is_over = True
-                    state.winner = enemy
-                    return
+                if enemy not in state.characters:
+                    continue
+
+                for player_name in ("ELEVEN", "MAX"):
+                    if player_name in state.characters and state.get_position(enemy) == state.get_position(player_name):
+                        state.is_over = True
+                        state.winner = enemy
+                        return
 
         state.is_over = False
         state.winner = None
@@ -328,30 +348,141 @@ class GameViewSet(viewsets.ModelViewSet):
             return random.choice(top)
 
         return self._random_free_cell(grid_size, reserved_positions)
+    
+
+    def _board_is_playable(self, grid_size, goal_position, player_positions, ai_positions, obstacles):
+        """
+        Checks whether the board remains playable after adding obstacles.
+
+        VEIN is treated as blocking.
+        TRAP is treated as passable.
+        """
+        blocked = {
+            pos
+            for pos, obstacle_type in obstacles
+            if obstacle_type == "VEIN"
+        }
+
+        for player_pos in player_positions:
+            if not self._path_exists(grid_size, player_pos, goal_position, blocked):
+                return False
+
+        if ai_positions and player_positions:
+            for ai_pos in ai_positions:
+                if not any(
+                    self._path_exists(grid_size, ai_pos, player_pos, blocked)
+                    for player_pos in player_positions
+                ):
+                    return False
+
+        return True
+
+
+    def _path_exists(self, grid_size, start, goal, blocked):
+        """
+        Breadth-first search to confirm that a path exists.
+        """
+        if start in blocked or goal in blocked:
+            return False
+
+        queue = [start]
+        visited = {start}
+
+        while queue:
+            current = queue.pop(0)
+
+            if current == goal:
+                return True
+
+            for neighbor in self._get_grid_neighbors(current, grid_size):
+                if neighbor in visited:
+                    continue
+
+                if neighbor in blocked:
+                    continue
+
+                visited.add(neighbor)
+                queue.append(neighbor)
+
+        return False
+
+
+    def _get_grid_neighbors(self, pos, grid_size):
+        x, y = pos
+        candidates = [
+            (x, y - 1),
+            (x, y + 1),
+            (x - 1, y),
+            (x + 1, y),
+        ]
+
+        return [
+            p for p in candidates
+            if self._is_within_bounds(p, grid_size)
+        ]
+
+
 
     def _create_obstacles(self, game, reserved_positions):
         """
-        Create a moderate number of safe obstacles.
-        Keeps spawn cells and goal cell free.
+        Create obstacles while preserving basic playability.
+
+        Guarantees:
+        - goal cell remains free
+        - spawn cells remain free
+        - Eleven can reach the goal
+        - Max can reach the goal, if present
+        - AI can reach at least one player, if present
         """
         grid_size = game.grid_size
         total_cells = grid_size * grid_size
-
-        # Conservative obstacle density for playability
         obstacle_count = max(2, total_cells // 6)
 
-        available_positions = [
+        characters = list(game.characters.all())
+
+        player_positions = [
+            (ch.x_pos, ch.y_pos)
+            for ch in characters
+            if ch.name in ["ELEVEN", "MAX"]
+        ]
+
+        ai_positions = [
+            (ch.x_pos, ch.y_pos)
+            for ch in characters
+            if ch.is_ai
+        ]
+
+        goal_position = (game.goal_x, game.goal_y)
+
+        candidate_positions = [
             (x, y)
             for x in range(grid_size)
             for y in range(grid_size)
             if (x, y) not in reserved_positions
         ]
 
-        random.shuffle(available_positions)
-        chosen_positions = available_positions[:obstacle_count]
+        random.shuffle(candidate_positions)
 
-        for idx, pos in enumerate(chosen_positions):
-            obstacle_type = "VEIN" if idx % 2 == 0 else "TRAP"
+        placed_obstacles = []
+
+        for pos in candidate_positions:
+            if len(placed_obstacles) >= obstacle_count:
+                break
+
+            obstacle_type = "VEIN" if len(placed_obstacles) % 2 == 0 else "TRAP"
+
+            test_obstacles = placed_obstacles + [(pos, obstacle_type)]
+
+            if self._board_is_playable(
+                grid_size=grid_size,
+                goal_position=goal_position,
+                player_positions=player_positions,
+                ai_positions=ai_positions,
+                obstacles=test_obstacles,
+            ):
+                placed_obstacles.append((pos, obstacle_type))
+
+        for pos, obstacle_type in placed_obstacles:
             Obstacle.objects.create(
                 game=game,
                 obstacle_type=obstacle_type,
