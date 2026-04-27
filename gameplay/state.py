@@ -182,38 +182,46 @@ class GameState:
     def advance_turn(self) -> None:
         """
         Turn handling:
-        - PVA: ELEVEN alternates with the AI enemy
-        - PVP: ELEVEN alternates with MAX
+        - PVA: ELEVEN -> AI -> ELEVEN
+        - PVP: ELEVEN -> MAX -> ELEVEN
+        - P2VA: ELEVEN -> MAX -> AI -> ELEVEN
         """
         if self.game_mode == "PVA":
             ai_name = self.AI_BY_LEVEL.get(self.difficulty_level, "DEMOGORGON")
+            turn_order = ["ELEVEN", ai_name]
 
-            if self.current_turn == "ELEVEN":
-                next_turn = ai_name
-            else:
-                next_turn = "ELEVEN"
+        elif self.game_mode == "PVP":
+            turn_order = ["ELEVEN", "MAX"]
 
-            if next_turn in self.characters and self.characters[next_turn].stuck:
-                self.characters[next_turn].stuck = False
-                next_turn = "ELEVEN" if next_turn != "ELEVEN" else ai_name
+        elif self.game_mode == "P2VA":
+            ai_name = self.AI_BY_LEVEL.get(self.difficulty_level, "DEMOGORGON")
+            turn_order = ["ELEVEN", "MAX", ai_name]
 
-            self.current_turn = next_turn
+        else:
+            self.current_turn = "ELEVEN"
             return
 
-        if self.game_mode == "PVP":
-            if self.current_turn == "ELEVEN":
-                next_turn = "MAX"
-            else:
-                next_turn = "ELEVEN"
-
-            if next_turn in self.characters and self.characters[next_turn].stuck:
-                self.characters[next_turn].stuck = False
-                next_turn = "ELEVEN" if next_turn == "MAX" else "MAX"
-
-            self.current_turn = next_turn
+        if self.current_turn not in turn_order:
+            self.current_turn = turn_order[0]
             return
 
-        self.current_turn = "ELEVEN"
+        current_index = turn_order.index(self.current_turn)
+        next_index = (current_index + 1) % len(turn_order)
+        next_turn = turn_order[next_index]
+
+        # Skip stuck characters once
+        checked = 0
+        while (
+            next_turn in self.characters
+            and self.characters[next_turn].stuck
+            and checked < len(turn_order)
+        ):
+            self.characters[next_turn].stuck = False
+            next_index = (next_index + 1) % len(turn_order)
+            next_turn = turn_order[next_index]
+            checked += 1
+
+        self.current_turn = next_turn
 
     def get_obstacle_at(self, pos: Position) -> Optional[str]:
         """
@@ -311,7 +319,26 @@ class GameState:
         return self.get_position(self.current_turn)
 
     def get_player_location(self) -> Position:
-        return self.get_position("ELEVEN")
+        """
+        Returns the target player location for AI pursuit.
+
+        In PVA:
+        - returns ELEVEN
+
+        In P2VA:
+        - returns the closest player to the active AI character
+        """
+        if self.current_turn in {"DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"}:
+            ai_pos = self.get_position(self.current_turn)
+            return self.get_closest_player_position(ai_pos)
+
+        if "ELEVEN" in self.characters:
+            return self.get_position("ELEVEN")
+
+        if "MAX" in self.characters:
+            return self.get_position("MAX")
+
+        return (0, 0)
 
     def is_goal(self, pos: Position) -> bool:
         return pos == self.get_player_location()
@@ -322,28 +349,35 @@ class GameState:
     def is_win(self, agent_name: str) -> bool:
         normalized = self.normalize_name(agent_name)
 
-        if normalized == "ELEVEN":
-            return self.player_at_goal()
-
-        if normalized in {"DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"}:
+        if normalized in {"ELEVEN", "MAX"}:
             return (
                 normalized in self.characters
-                and self.get_position(normalized) == self.get_position("ELEVEN")
+                and self.goal_position is not None
+                and self.get_position(normalized) == self.goal_position
             )
+
+        if normalized in {"DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"}:
+            for player_name in ("ELEVEN", "MAX"):
+                if player_name in self.characters and self.get_position(normalized) == self.get_position(player_name):
+                    return True
+            return False
 
         return False
 
     def is_loss(self, agent_name: str) -> bool:
         normalized = self.normalize_name(agent_name)
 
-        if normalized == "ELEVEN":
+        if normalized in {"ELEVEN", "MAX"}:
             for enemy in ("DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"):
-                if enemy in self.characters and self.get_position(enemy) == self.get_position("ELEVEN"):
+                if enemy in self.characters and self.get_position(enemy) == self.get_position(normalized):
                     return True
             return False
 
         if normalized in {"DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"}:
-            return self.player_at_goal()
+            for player_name in ("ELEVEN", "MAX"):
+                if player_name in self.characters and self.get_position(player_name) == self.goal_position:
+                    return True
+            return False
 
         return False
 

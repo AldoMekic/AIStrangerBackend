@@ -34,7 +34,7 @@ class MoveValidator:
 
     @staticmethod
     def is_terminal(state):
-        if state.game_mode == "PVA" and MoveValidator._agent_caught_player(state):
+        if state.game_mode in {"PVA", "P2VA"} and MoveValidator._agent_caught_player(state):
             return True
 
         if state.player_at_goal():
@@ -44,10 +44,22 @@ class MoveValidator:
 
     @staticmethod
     def _agent_caught_player(state):
-        player_pos = state.get_position('ELEVEN')
-        for monster in ['DEMOGORGON', 'SHADOWMONSTER', 'MINDFLAYER']:
-            if monster in state.characters and state.get_position(monster) == player_pos:
+        """
+        Returns True if any monster occupies the same cell as any human player.
+        Supports both:
+        - PVA: ELEVEN vs AI
+        - P2VA: ELEVEN + MAX vs AI
+        """
+        player_positions = []
+
+        for player_name in ("ELEVEN", "MAX"):
+            if player_name in state.characters:
+                player_positions.append(state.get_position(player_name))
+
+        for monster in ("DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"):
+            if monster in state.characters and state.get_position(monster) in player_positions:
                 return True
+
         return False
 
     @staticmethod
