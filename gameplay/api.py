@@ -170,7 +170,6 @@ class GameViewSet(viewsets.ModelViewSet):
 
         player_actor = state.current_turn
         before_player_state = state.clone()
-
         player_action = action_serializer.validated_data
 
         legal_actions = state.get_legal_moves()
@@ -193,16 +192,9 @@ class GameViewSet(viewsets.ModelViewSet):
             state_after=state,
         )
 
-        last_event = self._build_event(
-            actor=ai_actor,
-            action=ai_action,
-            state_before=before_ai_state,
-            state_after=state,
-        )
-
         if state.is_terminal():
             state.apply_to_game(game)
-            serializer = self.get_serializer(game)
+            serializer = self.get_serializer(game, context={"last_event": last_event})
             return Response(serializer.data)
 
         if state.game_mode in ["PVA", "P2VA"]:
@@ -238,6 +230,13 @@ class GameViewSet(viewsets.ModelViewSet):
 
                     state = state.result(ai_action)
                     self._finalize_terminal_state(state)
+
+                    last_event = self._build_event(
+                        actor=ai_actor,
+                        action=ai_action,
+                        state_before=before_ai_state,
+                        state_after=state,
+                    )
 
         state.apply_to_game(game)
         serializer = self.get_serializer(game, context={"last_event": last_event})

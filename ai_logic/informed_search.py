@@ -56,7 +56,7 @@ class ShadowmonsterAgent:
             if node.state in explored:
                 continue
 
-            if problem.is_goal(node.state):
+            if problem.is_ai_target(node.state):
                 return self.solution_path(node)
 
             explored.add(node.state)
