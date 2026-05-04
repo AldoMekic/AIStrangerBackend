@@ -339,9 +339,29 @@ class GameState:
             return self.get_position("MAX")
 
         return (0, 0)
+    
+    
 
-    def is_goal(self, pos: Position) -> bool:
+    def is_ai_target(self, pos: Position) -> bool:
+        """
+        AI pathfinding target check.
+
+        This is used by search algorithms (e.g., A*) and represents:
+        - "Has the AI reached its target player?"
+
+        This is NOT the same as the world/escape goal.
+        Use `is_exit_goal()` for the actual objective tile.
+        """
         return pos == self.get_player_location()
+    
+    def is_goal(self, pos: Position) -> bool:
+        """
+        Backward-compatible alias for AI pathfinding goal.
+
+        Historically used by A* search.
+        Prefer `is_ai_target()` for clearer semantics.
+        """
+        return self.is_ai_target(pos)
     
     def is_exit_goal(self, pos: Position) -> bool:
         """

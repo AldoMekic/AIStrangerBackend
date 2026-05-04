@@ -86,7 +86,7 @@ class GameViewSet(viewsets.ModelViewSet):
             name="ELEVEN",
             x_pos=eleven_pos[0],
             y_pos=eleven_pos[1],
-            has_powers=True,
+            has_powers=self._player_starts_with_powers("ELEVEN"),
             is_ai=False,
             stuck=False,
         )
@@ -100,7 +100,7 @@ class GameViewSet(viewsets.ModelViewSet):
                 name="MAX",
                 x_pos=max_pos[0],
                 y_pos=max_pos[1],
-                has_powers=True,
+                has_powers=self._player_starts_with_powers("MAX"),
                 is_ai=False,
                 stuck=False,
             )
@@ -124,7 +124,7 @@ class GameViewSet(viewsets.ModelViewSet):
                 name=enemy_name,
                 x_pos=enemy_pos[0],
                 y_pos=enemy_pos[1],
-                has_powers=False,
+                has_powers=self._ai_starts_with_powers(enemy_name),
                 is_ai=True,
                 stuck=False,
             )
@@ -555,3 +555,20 @@ class GameViewSet(viewsets.ModelViewSet):
                 event["end_reason"] = "GAME_OVER"
 
         return event
+    
+    def _player_starts_with_powers(self, character_name):
+        """
+        Hidden powers rule:
+        - ELEVEN starts with hidden powers.
+        - MAX starts with hidden powers.
+        - AI enemies do not start with hidden powers.
+        - Teleport is single-use because GameRules.result() sets has_powers=False after TELEPORT.
+        """
+        return character_name in {"ELEVEN", "MAX"}
+
+
+    def _ai_starts_with_powers(self, character_name):
+        """
+        AI enemies currently do not use hidden powers.
+        """
+        return False
