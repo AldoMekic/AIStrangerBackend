@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Game, Character, Obstacle
-from .serializers import GameSerializer
+from .serializers import GameSerializer, ActionSerializer
 from .state import GameState
 
 from ai_logic.adversarial_search import DemogorgonAgent
@@ -160,12 +160,18 @@ class GameViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        player_action = self._parse_action(request.data)
-        if player_action is None:
+        action_serializer = ActionSerializer(data=request.data)
+
+        if not action_serializer.is_valid():
             return Response(
-                {"error": "Invalid action payload."},
+                action_serializer.errors,
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        player_actor = state.current_turn
+        before_player_state = state.clone()
+
+        player_action = action_serializer.validated_data
 
         legal_actions = state.get_legal_moves()
         if not self._action_in_list(player_action, legal_actions):
@@ -179,6 +185,20 @@ class GameViewSet(viewsets.ModelViewSet):
 
         state = state.result(player_action)
         self._finalize_terminal_state(state)
+
+        last_event = self._build_event(
+            actor=player_actor,
+            action=player_action,
+            state_before=before_player_state,
+            state_after=state,
+        )
+
+        last_event = self._build_event(
+            actor=ai_actor,
+            action=ai_action,
+            state_before=before_ai_state,
+            state_after=state,
+        )
 
         if state.is_terminal():
             state.apply_to_game(game)
@@ -197,6 +217,8 @@ class GameViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
 
+                ai_actor = state.current_turn
+                before_ai_state = state.clone()
                 ai_action = self._get_ai_action(agent, state)
 
                 if ai_action is None:
@@ -218,7 +240,7 @@ class GameViewSet(viewsets.ModelViewSet):
                     self._finalize_terminal_state(state)
 
         state.apply_to_game(game)
-        serializer = self.get_serializer(game)
+        serializer = self.get_serializer(game, context={"last_event": last_event})
         return Response(serializer.data)
 
     def _get_agent(self, level):
@@ -234,30 +256,6 @@ class GameViewSet(viewsets.ModelViewSet):
         if state.difficulty_level in [1, 2]:
             return agent.get_action(state, level=state.difficulty_level)
         return agent.get_action(state)
-
-    def _parse_action(self, payload):
-        action_type = payload.get("type")
-
-        if action_type == "MOVE":
-            direction = payload.get("direction")
-            if direction in {"UP", "DOWN", "LEFT", "RIGHT"}:
-                return {"type": "MOVE", "direction": direction}
-            return None
-
-        if action_type == "TELEPORT":
-            destination = payload.get("destination")
-            if (
-                isinstance(destination, (list, tuple))
-                and len(destination) == 2
-                and all(isinstance(v, int) for v in destination)
-            ):
-                return {
-                    "type": "TELEPORT",
-                    "destination": (destination[0], destination[1]),
-                }
-            return None
-
-        return None
 
     def _action_in_list(self, action, legal_actions):
         normalized_target = self._normalize_action(action)
@@ -529,3 +527,31 @@ class GameViewSet(viewsets.ModelViewSet):
             return random.choice(top)
 
         return self._random_free_cell(grid_size, reserved_positions)
+    
+    def _build_event(self, actor, action, state_before, state_after):
+        event = {
+            "actor": actor,
+            "action_type": action["type"],
+            "teleport_used": action["type"] == "TELEPORT",
+            "trap_triggered": False,
+            "end_reason": None,
+        }
+
+        before_pos = state_before.get_position(actor) if actor in state_before.characters else None
+        after_pos = state_after.get_position(actor) if actor in state_after.characters else None
+
+        event["from"] = list(before_pos) if before_pos else None
+        event["to"] = list(after_pos) if after_pos else None
+
+        if after_pos is not None and state_after.get_obstacle_at(after_pos) == "TRAP":
+            event["trap_triggered"] = True
+
+        if state_after.is_over:
+            if state_after.winner in {"ELEVEN", "MAX"}:
+                event["end_reason"] = "PLAYER_REACHED_GOAL"
+            elif state_after.winner in {"DEMOGORGON", "SHADOWMONSTER", "MINDFLAYER"}:
+                event["end_reason"] = "PLAYER_CAUGHT"
+            else:
+                event["end_reason"] = "GAME_OVER"
+
+        return event
