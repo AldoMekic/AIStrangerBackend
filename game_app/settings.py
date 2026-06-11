@@ -87,7 +87,7 @@ DATABASES = {
 
 
 # CORS / CSRF
-FRONTEND_URL = "https://stranger-frontend-er3tohvyp-aldomekics-projects.vercel.app"
+FRONTEND_URL = "https://stranger-frontend-imouynjgw-aldomekics-projects.vercel.app"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
