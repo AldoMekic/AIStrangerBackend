@@ -1,11 +1,8 @@
 import heapq
+from ai_logic.evaluators import manhattan_distance, StrangerThingsEvaluator
 
 
 class Node:
-    """
-    Data structure representing a node in the search tree.
-    For A*, state is a position tuple: (x, y).
-    """
     def __init__(self, state, parent=None, action=None, path_cost=0, heuristic=0):
         self.state = state
         self.parent = parent
@@ -20,8 +17,10 @@ class Node:
 
 class ShadowmonsterAgent:
     """
-    AI Agent representing the Shadowmonster.
-    Implements Level 3: A* Search.
+    Level 3 strategy:
+    Uses A* to move toward a strategic position near the player.
+    The target is selected to reduce the player's escape options and
+    pressure them toward veins/traps.
     """
 
     def get_action(self, game_state):
@@ -29,7 +28,7 @@ class ShadowmonsterAgent:
 
     def a_star_search(self, problem):
         start_state = problem.get_current_state()
-        goal_state = problem.get_player_location()
+        goal_state = self.choose_cornering_target(problem)
 
         start_node = Node(
             state=start_state,
@@ -49,15 +48,13 @@ class ShadowmonsterAgent:
             if node.state in explored:
                 continue
 
-            if problem.is_ai_target(node.state):
+            if node.state == goal_state or problem.is_ai_target(node.state):
                 return self.solution_path(node)
 
             explored.add(node.state)
 
             for action in problem.get_legal_moves(node.state):
                 result_state = problem.result(node.state, action)
-
-                # problem.result(...) returns a GameState, so extract the AI's new position.
                 child_position = result_state.get_current_state()
 
                 new_cost = node.g + problem.step_cost(node.state, action)
@@ -79,6 +76,39 @@ class ShadowmonsterAgent:
                     heapq.heappush(frontier, child_node)
 
         return None
+
+    def choose_cornering_target(self, state):
+        ai_pos = state.get_current_state()
+        player_pos = state.get_player_location()
+
+        candidate_targets = []
+
+        # If capture is already possible, chase directly.
+        if manhattan_distance(ai_pos, player_pos) <= 1:
+            return player_pos
+
+        for pos in state.get_neighbors(player_pos):
+            if not state.is_within_bounds(pos):
+                continue
+
+            if state.is_impassable(pos):
+                continue
+
+            if state.is_occupied(pos):
+                continue
+
+            corner_score = StrangerThingsEvaluator.cornering_score(state, pos)
+            distance_penalty = manhattan_distance(ai_pos, pos)
+
+            score = corner_score - distance_penalty
+
+            candidate_targets.append((score, pos))
+
+        if not candidate_targets:
+            return player_pos
+
+        candidate_targets.sort(reverse=True, key=lambda item: item[0])
+        return candidate_targets[0][1]
 
     def manhattan_heuristic(self, state, goal):
         return abs(state[0] - goal[0]) + abs(state[1] - goal[1])

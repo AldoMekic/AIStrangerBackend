@@ -1,58 +1,63 @@
-import math
-
 def manhattan_distance(pos1, pos2):
-    """
-    Standard Manhattan (City Block) distance heuristic.
-    Admissible for grid-based movement because it never overestimates
-    the steps to the goal on a 4-direction grid.
-    """
     return abs(pos1[0] - pos2[0]) + abs(pos1[1] - pos2[1])
 
-class StrangerThingsEvaluator:
-    """
-    Centralized evaluator for the game's search algorithms [1, 2].
-    """
 
+class StrangerThingsEvaluator:
     @staticmethod
     def utility(state, agent_name):
-        """
-        Calculates utility for terminal states [5, 11].
-        Standard AI scale: +1000 for win, -1000 for loss [12].
-        """
         if state.is_win(agent_name):
             return 1000
         if state.is_loss(agent_name):
             return -1000
-        return 0 # Draw or neutral end
+        return 0
 
     @staticmethod
     def static_evaluation(state, agent_name):
-        """
-        Estimates the quality of non-terminal states [2].
-        Uses a weighted linear function to combine different features [13, 14].
-        """
-        # Feature extraction [15]
         agent_pos = state.get_position(agent_name)
         player_pos = state.get_closest_player_position(agent_pos)
-        
-        # 1. Proximity Feature: Closer to player is better for the AI [16]
-        dist = manhattan_distance(agent_pos, player_pos)
-        
-        # 2. Obstacle Penalty: Being near traps/veins is dangerous [14]
-        obstacle_penalty = 0
-        neighbors = state.get_neighbors(agent_pos)
-        for n in neighbors:
-            if state.is_hazard(n): # Veins or Traps [Requirement]
-                obstacle_penalty += 50
 
-        # Weighted combination [13]
-        # (Weight1 * proximity) + (Weight2 * hazard_safety)
-        # Note: Weights used here are illustrative and not from the sources.
-        return (-10 * dist) - obstacle_penalty
+        distance_score = -10 * manhattan_distance(agent_pos, player_pos)
+        corner_score = StrangerThingsEvaluator.cornering_score(state, player_pos)
+
+        if agent_name == "DEMOGORGON":
+            # Level 1 and 2: mainly chase the player.
+            return distance_score
+
+        if agent_name == "SHADOWMONSTER":
+            # Level 3: prefer forcing the player near obstacles.
+            return corner_score - 3 * manhattan_distance(agent_pos, player_pos)
+
+        if agent_name == "MINDFLAYER":
+            # Level 4: combine chasing and cornering.
+            return distance_score + corner_score
+
+        return distance_score
+
+    @staticmethod
+    def cornering_score(state, player_pos):
+        """
+        Higher score means the player has fewer safe escape options
+        and is closer to hazards.
+        """
+        score = 0
+
+        safe_escape_count = 0
+
+        for neighbor in state.get_neighbors(player_pos):
+            if state.is_impassable(neighbor):
+                score += 25
+                continue
+
+            if state.is_hazard(neighbor):
+                score += 20
+
+            if not state.is_occupied(neighbor):
+                safe_escape_count += 1
+
+        score += (4 - safe_escape_count) * 30
+
+        return score
 
     @staticmethod
     def a_star_h(current_pos, goal_pos):
-        """
-        The heuristic h(n) specifically for Level 3 A* Search [6, 8].
-        """
         return manhattan_distance(current_pos, goal_pos)
